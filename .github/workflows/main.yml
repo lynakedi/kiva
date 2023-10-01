@@ -1,4 +1,3 @@
-Here is the build.yml file for converting Kivy app into android apk using GitHub action workflows,
 
 name: CI
 on:
