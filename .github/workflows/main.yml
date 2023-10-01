@@ -1,48 +1,44 @@
-from kivy.app import App
-from kivy.uix.button import Button
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.textinput import TextInput
+Here is the build.yml file for converting Kivy app into android apk using GitHub action workflows,
 
+name: CI
+on:
+  push:
+    branches: [ main ]
 
-class MainApp(App):
-    def build(self):
-        main_layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.solution = TextInput(multiline=False, readonly=False, halign="right", font_size=55)
-        main_layout.add_widget(self.solution)
-        buttons = [
-            ["7", "8", "9", "/"],
-            ["4", "5", "6", "*"],
-            ["1", "2", "3", "-"],
-            [".", "0", "C", "+"],
-        ]
-        for row in buttons:
-            h_layout = BoxLayout()
-            for label in row:
-                button = Button(text=label, pos_hint={"center_x": 0.5, "center_y": 0.5})
-                button.bind(on_press=self.on_button_press)
-                h_layout.add_widget(button)
-            main_layout.add_widget(h_layout)
+jobs:
+  build:
+    runs-on: ubuntu-20.04
 
-        equals_button = Button(text="=", pos_hint={"center_x": 0.5, "center_y": 0.5})
-        equals_button.bind(on_press=self.on_solution)
-        main_layout.add_widget(equals_button)
+    steps:
+      - uses: actions/checkout@v2
 
-        # return a Button() as a root widget
-        return main_layout
+      # used to cache dependencies with a timeout
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
+        shell: bash
 
-    def on_button_press(self, instance):
-        if instance.text == "C":
-            self.solution.text = ""
-        else:
-            self.solution.text += instance.text
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v2
+        with:
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }} # Replace with your path
 
-    def on_solution(self, instance):
-        if self.solution.text:
-            try:
-                self.solution.text = str(eval(self.solution.text))
-            except:
-                self.solution.text = "Error"
+      - uses: actions/cache@v2
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
 
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: buildozer android debug
+          buildozer_version: stable
 
-if __name__ == '__main__':
-    MainApp().run()
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: package
+          path: ${{ steps.buildozer.outputs.filename }}
